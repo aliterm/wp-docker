@@ -1,0 +1,75 @@
+version: "3.8"
+x-wp-variables: &wp-variables
+  WORDPRESS_DB_USER: wp-user
+  WORDPRESS_DB_PASSWORD: wp-pass
+  WORDPRESS_DB_NAME: wpdb
+  WORDPRESS_DB_HOST: mariadb
+  WORDPRESS_TABLE_PREFIX: wp_
+  MYSQL_PORT_3306_TCP: 3306
+  WORDPRESS_DEBUG: 1
+services:
+  db:
+    image: mariadb:latest
+    command: [
+        '--default_authentication_plugin=mysql_native_password',
+        '--character-set-server=utf8mb4',
+        '--collation-server=utf8mb4_unicode_ci'
+    ]
+    restart: unless-stopped
+    environment:
+      MARIADB_ROOT_PASSWORD: root
+      MARIADB_DATABASE: wpdb
+      MARIADB_USER: wp-user
+      MARIADB_PASSWORD: wp-pass
+    ports:
+      - 3306:3306
+    volumes:
+      - db-data:/var/lib/mysql
+
+  wp:
+    build:
+      dockerfile: wp-dockerfile
+    depends_on:
+      - db
+    links:
+      - db:mariadb
+    ports:
+      - 80:80
+      - 443:443
+    restart: unless-stopped
+    environment: *wp-variables
+    working_dir: /var/www/html
+    volumes:
+      - wp-data:/var/www/html
+
+  wp-cli:
+    image: wordpress:cli
+    depends_on:
+      - db
+      - wp
+    links:
+      - db:mariadb
+    user: xfs
+    restart: always
+    volumes:
+      - wp-data:/var/www/html
+    environment: *wp-variables
+    command: >
+      sh -c 'wp core install --path="/var/www/html" \
+            --title="WP Docker" \
+            --url="https://localhost" \
+            --admin_user="wp" \
+            --admin_password="password" \
+            --admin_email="me@example.com" \
+            --skip-email'
+
+networks:
+  default:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.16.57.0/24
+
+volumes:
+  wp-data:
+  db-data:
