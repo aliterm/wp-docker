@@ -28,6 +28,7 @@ services:
 
   wp:
     build:
+      context: .
       dockerfile: wp-dockerfile
     depends_on:
       - db
